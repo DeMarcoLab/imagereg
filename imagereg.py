@@ -32,7 +32,7 @@ def align_images(image, shift, pad_width=None):
     return image
 
 
-def register_translation(src_image, target_image):
+def register_translation(src_image, target_image, bandpass_mask=None):
     """Calculate pixel shift between two input images.
 
     This function runs with numpy or cupy for GPU acceleration.
@@ -43,6 +43,8 @@ def register_translation(src_image, target_image):
         Reference image.
     target_image : array
         Image to register.  Must be same dimensionality as ``src_image``.
+    bandpass_mask : array
+        Fourier mask image array, by default None.
 
     Returns
     -------
@@ -59,6 +61,9 @@ def register_translation(src_image, target_image):
     shape = src_freq.shape
     image_product = src_freq * target_freq.conj()
     cross_correlation = np.fft.ifftn(image_product)
+    # Fourier bandpass filtering
+    if bandpass_mask:
+        cross_correlation = cross_correlation * bandpass_mask
     # Locate maximum
     maxima = np.unravel_index(np.argmax(np.abs(cross_correlation)),
                               cross_correlation.shape)
