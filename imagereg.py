@@ -32,7 +32,8 @@ def align_images(image, shift, pad_width=None):
     return image
 
 
-def register_translation(src_image, target_image, bandpass_mask=None):
+def register_translation(src_image, target_image,
+                         max_shift=None, bandpass_mask=None):
     """Calculate pixel shift between two input images.
 
     This function runs with numpy or cupy for GPU acceleration.
@@ -43,6 +44,9 @@ def register_translation(src_image, target_image, bandpass_mask=None):
         Reference image.
     target_image : array
         Image to register.  Must be same dimensionality as ``src_image``.
+    max_shift : int or tuple of int
+        The maximum shift allowed in the returned values.
+        If a tuple, x and y maximum shifts are specified independently.
     bandpass_mask : array
         Fourier mask image array, by default None.
 
@@ -70,8 +74,14 @@ def register_translation(src_image, target_image, bandpass_mask=None):
     midpoints = np.array([float(np.fix(axis_size / 2)) for axis_size in shape])
     shifts = np.array(maxima, dtype=np.float64)
     shifts[shifts > midpoints] -= np.array(shape)[shifts > midpoints]
-    shifts = np.flip(shifts, axis=0)  # x, y order
-    return shifts.astype(np.int)
+    shifts = np.flip(shifts, axis=0).astype(np.int)  # x, y order
+    # Clip to maximum allowable shift
+    if isinstance(max_shift, int):
+        shifts = np.clip(shifts, a_max=max_shift, a_min=None)
+    elif isinstance(max_shift, tuple):
+        shifts[0] = np.clip(shifts[0], a_max=max_shift[0], a_min=None)  # in x
+        shifts[1] = np.clip(shifts[1], a_max=max_shift[1], a_min=None)  # in y
+    return shifts
 
 
 def bandpass_mask(image_shape, outer_radius, inner_radius=0):
