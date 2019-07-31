@@ -95,6 +95,10 @@ def bandpass_mask(image_shape, outer_radius, inner_radius=0):
     bandpass_mask[outer_circle_rr, outer_circle_cc] = 1.0
     bandpass_mask[inner_circle_rr, inner_circle_cc] = 0.0
     bandpass_mask = np.array(bandpass_mask)
+    # fourier space origin should be in the corner
+    bandpass_mask = np.roll(bandpass_mask,
+                            (np.array(image_shape) / 2).astype(int),
+                            axis=(0, 1))
     return bandpass_mask
 
 
