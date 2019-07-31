@@ -202,22 +202,31 @@ def find_filenames(filename_pattern):
     return filenames
 
 
-def read_files(filenames):
+def read_files(filenames, cropping_coordinates=None):
     """Generator returning paired image frames from a list of filenames.
 
     Parameters
     ----------
     filenames : listlike, str
         Ordered list of filenames corresponding to images on disk.
+    cropping_coordinates : tuple
+        Coordinates for cropping images, (topleft_x, topleft_y, width, height)
     """
     for i, _ in enumerate(filenames[:-1]):
         filename_1 = filenames[i]
         filename_2 = filenames[i + 1]
         image_1 = skimage.io.imread(filename_1)
         image_2 = skimage.io.imread(filename_2)
-        # This is not redundant if you are overriding numpy with cupy
-        image_1 = np.array(image_1)
-        image_2 = np.array(image_2)
+        if cropping_coordinates:
+            topleft_x, topleft_y, width, height = cropping_coordinates
+            slicer = (slice(topleft_y, topleft_y + height),
+                      slice(topleft_x, topleft_x + width))
+            image_1 = np.array(image_1[slicer])
+            image_2 = np.array(image_2[slicer])
+        else:
+            # This is not redundant if you are overriding numpy with cupy
+            image_1 = np.array(image_1)
+            image_2 = np.array(image_2)
         yield image_1, image_2
 
 
