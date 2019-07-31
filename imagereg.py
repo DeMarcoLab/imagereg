@@ -1,7 +1,9 @@
 import csv
 
 import cupy as np
+import numpy
 import pandas as pd
+import skimage.draw
 import skimage.io
 
 
@@ -65,6 +67,35 @@ def register_translation(src_image, target_image):
     shifts[shifts > midpoints] -= np.array(shape)[shifts > midpoints]
     shifts = np.flip(shifts, axis=0)  # x, y order
     return shifts.astype(np.int)
+
+
+def bandpass_mask(image_shape, outer_radius, inner_radius=0):
+    """Create a fourier bandpass mask.
+
+    Parameters
+    ----------
+    image_shape : tuple
+        Shape of the original image array
+    outer_radius : int
+        Outer radius for bandpass filter array.
+    inner_radius : int, optional
+        Inner radius for bandpass filter array, by default 0
+
+    Returns
+    -------
+    bandpass_mask : ndarray
+        The bandpass image mask.
+    """
+    bandpass_mask = numpy.zeros(image_shape)
+    r, c = numpy.array(image_shape) / 2
+    inner_circle_rr, inner_circle_cc = skimage.draw.circle(
+        r, c, inner_radius, shape=image_shape)
+    outer_circle_rr, outer_circle_cc = skimage.draw.circle(
+        r, c, outer_radius, shape=image_shape)
+    bandpass_mask[outer_circle_rr, outer_circle_cc] = 1.0
+    bandpass_mask[inner_circle_rr, inner_circle_cc] = 0.0
+    bandpass_mask = np.array(bandpass_mask)
+    return bandpass_mask
 
 
 def calculate_relative_shifts(filenames):
