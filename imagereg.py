@@ -33,7 +33,7 @@ def align_images(image, shift, pad_width=None):
 
 
 def register_translation(src_image, target_image,
-                         max_shift=None, bandpass_mask=None):
+                         max_shift_mask=None, bandpass_mask=None):
     """Calculate pixel shift between two input images.
 
     This function runs with numpy or cupy for GPU acceleration.
@@ -44,9 +44,8 @@ def register_translation(src_image, target_image,
         Reference image.
     target_image : array
         Image to register.  Must be same dimensionality as ``src_image``.
-    max_shift : int or tuple of int
-        The maximum shift allowed in the returned values.
-        If a tuple, x and y maximum shifts are specified independently.
+    max_shift_mask : array
+        The fourier mask restricting the maximum allowable pixel shift.
     bandpass_mask : array
         Fourier mask image array, by default None.
 
@@ -61,13 +60,17 @@ def register_translation(src_image, target_image,
     """
     src_freq = np.fft.fftn(src_image)
     target_freq = np.fft.fftn(target_image)
+    # Fourier bandpass filtering
+    if bandpass_mask:
+        src_freq = src_freq * bandpass_mask
+        target_freq = target_freq * bandpass_mask
     # Whole-pixel shift - Compute cross-correlation by an IFFT
     shape = src_freq.shape
     image_product = src_freq * target_freq.conj()
     cross_correlation = np.fft.ifftn(image_product)
-    # Fourier bandpass filtering
-    if bandpass_mask:
-        cross_correlation = cross_correlation * bandpass_mask
+    # Limit maximum allowable shift
+    if max_shift_mask:
+        cross_correlation = cross_correlation * max_shift_mask
     # Locate maximum
     maxima = np.unravel_index(np.argmax(np.abs(cross_correlation)),
                               cross_correlation.shape)
@@ -75,13 +78,13 @@ def register_translation(src_image, target_image,
     shifts = np.array(maxima, dtype=np.float64)
     shifts[shifts > midpoints] -= np.array(shape)[shifts > midpoints]
     shifts = np.flip(shifts, axis=0).astype(np.int)  # x, y order
-    # Clip to maximum allowable shift
-    if isinstance(max_shift, int):
-        shifts = np.clip(shifts, a_max=max_shift, a_min=None)
-    elif isinstance(max_shift, tuple):
-        shifts[0] = np.clip(shifts[0], a_max=max_shift[0], a_min=None)  # in x
-        shifts[1] = np.clip(shifts[1], a_max=max_shift[1], a_min=None)  # in y
     return shifts
+
+
+def normalize_image(image):
+    image = image - np.mean(image)
+    image = image / np.std(image)
+    return image
 
 
 def bandpass_mask(image_shape, outer_radius, inner_radius=0):
@@ -115,6 +118,25 @@ def bandpass_mask(image_shape, outer_radius, inner_radius=0):
                             (np.array(image_shape) / 2).astype(int),
                             axis=(0, 1))
     return bandpass_mask
+
+
+def max_shift_mask(image_shape, max_allowable_shift):
+    """Create a fourier mask to restrict image registration shift values.
+
+    Parameters
+    ----------
+    image_shape : tuple
+        Shape of the original image array
+    max_allowable_shift : int
+        Maximum allowable pixel shift for image registration.
+
+    Returns
+    -------
+    fourier_mask : ndarray
+        The fourier mask for restricting image registration shifts.
+    """
+    fourier_mask = bandpass_mask(image_shape, outer_radius=max_allowable_shift)
+    return fourier_mask
 
 
 def calculate_relative_shifts(filenames):
@@ -202,7 +224,7 @@ def find_filenames(filename_pattern):
     return filenames
 
 
-def read_files(filenames, cropping_coordinates=None):
+def read_files(filenames, cropping_coordinates=None, normalize=True):
     """Generator returning paired image frames from a list of filenames.
 
     Parameters
@@ -227,6 +249,9 @@ def read_files(filenames, cropping_coordinates=None):
             # This is not redundant if you are overriding numpy with cupy
             image_1 = np.array(image_1)
             image_2 = np.array(image_2)
+        if normalize:
+            image_1 = normalize_image(image_1)
+            image_2 = normalize_image(image_2)
         yield image_1, image_2
 
 
