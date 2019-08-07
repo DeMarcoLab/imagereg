@@ -1,0 +1,3 @@
+-r requirements/requirements-default.txt
+-r requirements/requirements-gpu.txt
+-r requirements/requirements-dev.txt

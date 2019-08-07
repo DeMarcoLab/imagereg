@@ -1,7 +1,18 @@
 import csv
+import logging
+import os
 
-import cupy as np
-import numpy
+try:
+    import cupy as np
+    GPU_AVAILABLE = True
+except ModuleNotFoundError:
+    logging.warning('cupy not installed, '
+                    'falling back to cpu only calculations with numpy')
+    import numpy as np
+    GPU_AVAILABLE = False
+
+import click
+import numpy  # this line is not redundant
 import pandas as pd
 import skimage.draw
 import skimage.io
@@ -26,7 +37,7 @@ def align_images(image, shift, pad_width=None):
         The ahifted image.
     """
     if pad_width:
-        image = np.pad(image, pad_wdith, mode='constant', constant_values=0)
+        image = np.pad(image, pad_width, mode='constant', constant_values=0)
     image = np.roll(image, shift[0], axis=1)
     image = np.roll(image, shift[1], axis=0)
     return image
@@ -255,14 +266,17 @@ def read_files(filenames, cropping_coordinates=None, normalize=True):
         yield image_1, image_2
 
 
-def align_and_save_images(filenames, cumulative_shift_df, pad_width=None,
-                          gpu=False):
+def align_and_save_images(filenames, output_directory, cumulative_shift_df,
+                          pad_width=None, gpu=GPU_AVAILABLE):
     """
+    Aligns and saves images.
 
     Parameters
     ----------
     filenames : listlike, str
         Ordered list of filenames (alphabetical ordering).
+    output_directory : str
+        Directory location to save the output images.
     cumulative_shift_df : DataFrame
         Dataframe containing two columns named 'x_shift', and 'y_shift'.
         The values in the columns must be the cumulative shift,
@@ -270,6 +284,10 @@ def align_and_save_images(filenames, cumulative_shift_df, pad_width=None,
     pad_width : {sequence, array_like, int}, optional
         Padding widths in the form expected by numpy.pad, by default None.
         ((before_1, after_1), … (before_N, after_N))
+
+    Returns
+    -------
+    output_filename, aligned_image
     """
     for filename, (idx, row) in zip(filenames, cumulative_shift_df.iterrows()):
         image = skimage.io.imread(filename)
@@ -277,36 +295,80 @@ def align_and_save_images(filenames, cumulative_shift_df, pad_width=None,
         shift = [int(row['x_shift']), int(row['y_shift'])]
         aligned_image = align_images(image, shift, pad_width=pad_width)
         # this could be handled in a nicer way, by splitting the filename
-        output_filename = 'My_Aligned_' + filename
+        output_filename = os.path.join(
+            output_directory, 'Aligned_' + os.path.basename(filename))
         if gpu:
             skimage.io.imsave(output_filename, np.asnumpy(aligned_image))
         else:
             skimage.io.imsave(output_filename, aligned_image)
         print('Saved: {}'.format(output_filename))
-        yield filename, aligned_image
+        yield output_filename, aligned_image
 
 
-def main():
-    regex_pattern = 'SEM Image 2-[0-9][0-9][0-9]_000-000.tif'
-    filenames = find_filenames(regex_pattern)
+def check_directory(directory_path):
+    # If the directory doesn't exist, create it
+    # If the directory does exist, check it is empty
+    if not os.path.exists(directory_path):
+        os.mkdir(directory_path)
+        logging.info('Created new directory: {}'.format(directory_path))
+    else:
+        if not os.listdir(directory_path) == []:
+            message_directory_is_not_empty = (
+                'Output directory must be empty. '
+                'Please choose another location to save output files.'
+            )
+            logging.error(message_directory_is_not_empty)
+            raise ValueError(message_directory_is_not_empty)
+        if not os.access(directory_path, os.W_OK):
+            message_directory_is_not_writable = (
+                'Output directory must have correct permissions to write data.'
+                'Please choose another location to save output files.'
+            )
+            logging.error(message_directory_is_not_writable)
+            raise ValueError(message_directory_is_not_writable)
 
-    output_relative_shifts = 'relative_shifts.csv'
-    output_cumulative_shifts = 'cumulative_shifts.csv'
+
+@click.command()
+@click.argument('input_directory',
+                type=click.Path(exists=True, dir_okay=True, writable=True))
+@click.argument('regex_pattern')
+@click.argument('output_directory',
+                type=click.Path(exists=True, dir_okay=True, writable=True))
+def run_full_pipeline(input_directory, regex_pattern, output_directory):
+    pipeline(input_directory, regex_pattern, output_directory)
+
+
+def pipeline(input_directory, regex_pattern, output_directory):
+    # Set up output file location
+    check_directory(output_directory)
+    output_relative_shifts = os.path.join(
+        output_directory, 'relative_shifts.csv')
+    output_cumulative_shifts = os.path.join(
+        output_directory, 'cumulative_shifts.csv')
+    # Set up inputs
+    full_regex_pattern = os.path.join(input_directory, regex_pattern)
+    filenames = find_filenames(full_regex_pattern)
+    # Pipeline stage 1
+    # Calculate relative shifts
     with open(output_relative_shifts, "w") as f:
         writes = csv.writer(f, delimiter=',', quoting=csv.QUOTE_ALL)
         writes.writerows([['x_shift', 'y_shift']])
         writes.writerows([[0, 0]])   # the first frame is the anchor, no shift
         writes.writerows(calculate_relative_shifts(filenames))
-
+    # Pipeline stage 2
+    # Calculate the cumulative shifts
     relative_shift_df = pd.read_csv(output_relative_shifts)
     cumulative_shift_df = calculate_cumulative_shifts(relative_shift_df)
     relative_shift_df.to_csv(output_cumulative_shifts)
-    pad_wdith = calculate_padding(relative_shift_df)
-    mygenerator = align_and_save_images(filenames, cumulative_shift_df,
-                                        pad_width=pad_width, gpu=True)
-    for ff, aa in mygenerator:
-        print(ff)
+    # Pipeline stage 3
+    # Aligning and saving the images
+    # Must have relative_shift_df and cumulative_shift_df both in memory
+    pad_width = calculate_padding(relative_shift_df)
+    mygenerator = align_and_save_images(
+        filenames, output_directory, cumulative_shift_df, pad_width=pad_width)
+    for filename_out, _ in mygenerator:
+        print(filename_out)
 
 
 if __name__ == '__main__':
-    main()
+    run_full_pipeline()
