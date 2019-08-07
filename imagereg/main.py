@@ -376,7 +376,7 @@ def pipeline(input_directory, regex_pattern, output_directory):
     # Pipeline stage 3
     # Aligning and saving the images
     # Must have relative_shift_df and cumulative_shift_df both in memory
-    pad_width = calculate_padding(relative_shift_df)
+    pad_width = calculate_padding(cumulative_shift_df)
     mygenerator = align_and_save_images(
         filenames, output_directory, cumulative_shift_df, pad_width=pad_width)
     for filename_out, _ in mygenerator:
