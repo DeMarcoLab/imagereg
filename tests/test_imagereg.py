@@ -12,8 +12,32 @@ from imagereg.main import (align_images,
                            check_directory,
                            find_filenames,
                            normalize_image,
+                           pipeline,
                            register_translation,
                            )
+
+
+def test_pipeline(tmp_path):
+    input_directory = os.path.join(os.path.dirname(__file__), 'images')
+    regex_pattern = 'img[0-9].tif'
+    output_directory = tmp_path / "pipeline_test_output"
+    output_directory.mkdir()
+    pipeline(input_directory, regex_pattern, output_directory)
+    expected_filenames = ['Aligned_img1.tif',
+                          'Aligned_img2.tif',
+                          'Aligned_img3.tif',
+                          'cumulative_shifts.csv',
+                          'relative_shifts.csv']
+    assert len(os.listdir(output_directory)) == 5  # 3 aligned images & 2 csv
+    assert os.listdir(output_directory) == expected_filenames
+    expected_output_dir = os.path.join(os.path.dirname(__file__),
+                                       'image_output')
+    for i in range(1, 4):
+        output_image = skimage.io.imread(
+            os.path.join(output_directory, 'Aligned_img{}.tif'.format(i)))
+        expected_output = skimage.io.imread(
+            os.path.join(expected_output_dir, 'Aligned_img{}.tif'.format(i)))
+        assert np.allclose(output_image, expected_output)
 
 
 def test_check_directory_empty(tmp_path):
