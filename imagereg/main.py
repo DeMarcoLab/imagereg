@@ -93,6 +93,19 @@ def register_translation(src_image, target_image,
 
 
 def normalize_image(image):
+    """Ensure the image mean is zero and the standard deviation is one.
+
+    Parameters
+    ----------
+    image : ndarray
+        The input image array.
+
+    Returns
+    -------
+    image
+        The normalized image.
+        The mean intensity is equal to zero and standard deviation equals one.
+    """
     image = image - np.mean(image)
     image = image / np.std(image)
     return image
@@ -359,7 +372,7 @@ def pipeline(input_directory, regex_pattern, output_directory):
     # Calculate the cumulative shifts
     relative_shift_df = pd.read_csv(output_relative_shifts)
     cumulative_shift_df = calculate_cumulative_shifts(relative_shift_df)
-    relative_shift_df.to_csv(output_cumulative_shifts)
+    cumulative_shift_df.to_csv(output_cumulative_shifts)
     # Pipeline stage 3
     # Aligning and saving the images
     # Must have relative_shift_df and cumulative_shift_df both in memory
