@@ -36,8 +36,11 @@ def test_pipeline(tmp_path):
                           'Aligned_img3.tif',
                           'cumulative_shifts.csv',
                           'relative_shifts.csv']
-    assert len(os.listdir(output_directory)) == 5  # 3 aligned images & 2 csv
-    assert os.listdir(output_directory) == expected_filenames
+    expected_filenames.sort()
+    result_filenames = os.listdir(output_directory)
+    result_filenames.sort()
+    assert len(result_filenames) == 5  # 3 aligned images & 2 csv
+    assert result_filenames == expected_filenames
     expected_output_dir = os.path.join(os.path.dirname(__file__),
                                        'image_output')
     for i in range(1, 4):

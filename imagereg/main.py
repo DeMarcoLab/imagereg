@@ -69,6 +69,8 @@ def register_translation(src_image, target_image,
     ----------
     scikit-image register_translation function in the skimage.feature module.
     """
+    src_image = np.array(src_image)
+    target_image = np.array(target_image)
     src_freq = np.fft.fftn(src_image)
     target_freq = np.fft.fftn(target_image)
     # Fourier bandpass filtering
