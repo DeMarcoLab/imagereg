@@ -1,4 +1,5 @@
 import os
+import logging
 
 try:
     import cupy as np
