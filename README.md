@@ -13,6 +13,11 @@ $ pip install https://github.com:DeMarcoLab/imagereg.git
 
 Then there are two options for running the program: from the command line, and from within python.
 
+The `pipeline` image registration function takes three input arguments:
+* The path to the input image directory
+* The regex string describing the file naming. Filenames matching this regex are sorted alphabetically before image alignment.
+* The path to an empty output directory where you would like to save the results. This *must* be an empty directory.
+
 ### 1. From the command line
 ```
 conda activate imagereg
@@ -24,9 +29,10 @@ python path/to/imagereg/main.py tests/images img[0-9].tif output_directory
 
 ```
 $ conda activate imagereg
+$ mkdir output_directory
 $ python
 >>> import imagereg
->>> imagereg.pipeline('tests\images', 'img[0-9].tif', 'output_directory')
+>>> imagereg.pipeline('tests/images', 'img[0-9].tif', 'output_directory')
 ```
 
 ## Setting up your development environment
