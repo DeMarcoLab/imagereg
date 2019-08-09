@@ -1,6 +1,14 @@
 import os
 
-import numpy as np
+try:
+    import cupy as np
+    GPU_AVAILABLE = True
+except ModuleNotFoundError:
+    logging.warning('cupy not installed, '
+                    'falling back to cpu only calculations with numpy')
+    import numpy as np
+    GPU_AVAILABLE = False
+
 import pandas as pd
 import pytest
 import skimage.io
@@ -78,8 +86,8 @@ def test_calculate_relative_shifts():
     generator = calculate_relative_shifts(filenames)
     result_1 = next(generator)  # relative shift between image 1 and 2
     result_2 = next(generator)  # relative shift between image 2 and 3
-    assert all(result_1 == [18,  3])
-    assert all(result_2 == [13, -5])
+    assert list(result_1) == [18,  3]
+    assert list(result_2) == [13, -5]
 
 
 def test_calculate_cumulative_shifts():
