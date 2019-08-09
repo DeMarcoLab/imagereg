@@ -1,5 +1,16 @@
 # GPU accelerated image registration
 
+This package provides GPU accelerated image registration. It will fall back to CPU computation if GPU is not available.
+
+For example, given this input:
+
+<img src="docs/animations/original_images.gif" width="200">
+
+This is the aligned image output:
+
+<img src="docs/animations/output_images.gif" width="200">
+
+
 ## How to run the program
 First, create the python environment if you do not have one set up already.
 ```
