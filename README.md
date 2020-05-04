@@ -15,7 +15,7 @@ This is the aligned image output:
 First, create the python environment if you do not have one set up already.
 ```
 $ cd imagereg
-$ conda env -n imagereg python=3.6.8 pip
+$ conda env create -n imagereg python=3.6.8 pip
 $ source activate imagereg
 $ pip install -r requirements.txt
 $ pip install https://github.com:DeMarcoLab/imagereg.git
