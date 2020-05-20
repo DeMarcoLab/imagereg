@@ -18,7 +18,7 @@ $ cd imagereg
 $ conda create -n imagereg python=3.6.8 pip
 $ source activate imagereg
 $ pip install -r requirements.txt
-$ pip install https://github.com:DeMarcoLab/imagereg.git
+$ pip install https://github.com/DeMarcoLab/imagereg.git
 ```
 
 
