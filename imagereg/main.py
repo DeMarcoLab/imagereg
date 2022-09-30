@@ -18,6 +18,7 @@ import numpy  # this line is not redundant
 import pandas as pd
 import skimage.draw
 import skimage.io
+from tqdm import tqdm
 
 
 def align_images(image, shift, pad_width=None):
@@ -176,7 +177,7 @@ def calculate_relative_shifts(filenames):
         Ordered list of filenames
     """
     my_generator = read_files(filenames)
-    for (img1, img2) in my_generator:
+    for (img1, img2) in tqdm(my_generator, total=len(filenames)):
         shift = register_translation(img1, img2)
         yield shift
 
@@ -310,7 +311,7 @@ def align_and_save_images(filenames, output_directory, cumulative_shift_df,
     -------
     output_filename, aligned_image
     """
-    for filename, (idx, row) in zip(filenames, cumulative_shift_df.iterrows()):
+    for filename, (idx, row) in tqdm(zip(filenames, cumulative_shift_df.iterrows()), total=len(filenames)):
         image = skimage.io.imread(filename)
         image = np.array(image)  # not redundant, if you import cupy as np
         shift = [int(row['x_shift']), int(row['y_shift'])]
@@ -322,8 +323,8 @@ def align_and_save_images(filenames, output_directory, cumulative_shift_df,
             skimage.io.imsave(output_filename, np.asnumpy(aligned_image))
         else:
             skimage.io.imsave(output_filename, aligned_image)
-        print('Saved: {}'.format(output_filename))
-        yield output_filename, aligned_image
+        # print('Saved: {}'.format(output_filename))
+        # yield output_filename, aligned_image
 
 
 def check_directory(directory_path):
@@ -382,15 +383,15 @@ def pipeline(input_directory, regex_pattern, output_directory):
     relative_shift_df = pd.read_csv(output_relative_shifts)
     cumulative_shift_df = calculate_cumulative_shifts(relative_shift_df)
     cumulative_shift_df.to_csv(output_cumulative_shifts)
+    print('Pipeline stage 2 complete')
     # Pipeline stage 3
     print('Running pipeline stage 3')
     # Aligning and saving the images
     # Must have relative_shift_df and cumulative_shift_df both in memory
     pad_width = calculate_padding(cumulative_shift_df)
-    mygenerator = align_and_save_images(
+    align_and_save_images(
         filenames, output_directory, cumulative_shift_df, pad_width=pad_width)
-    for filename_out, _ in mygenerator:
-        print(filename_out)
+    print("Finished.")
 
 
 if __name__ == '__main__':
