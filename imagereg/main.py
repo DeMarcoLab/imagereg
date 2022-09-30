@@ -323,8 +323,7 @@ def align_and_save_images(filenames, output_directory, cumulative_shift_df,
             skimage.io.imsave(output_filename, np.asnumpy(aligned_image))
         else:
             skimage.io.imsave(output_filename, aligned_image)
-        # print('Saved: {}'.format(output_filename))
-        # yield output_filename, aligned_image
+        yield output_filename, aligned_image
 
 
 def check_directory(directory_path):
