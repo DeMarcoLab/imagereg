@@ -93,7 +93,7 @@ def register_translation(src_image, target_image,
     midpoints = np.array([float(np.fix(axis_size / 2)) for axis_size in shape])
     shifts = np.array(maxima, dtype=np.float64)
     shifts[shifts > midpoints] -= np.array(shape)[shifts > midpoints]
-    shifts = np.flip(shifts, axis=0).astype(np.int)  # x, y order
+    shifts = np.flip(shifts, axis=0).astype(int)  # x, y order
     return shifts
 
 
