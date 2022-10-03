@@ -1,4 +1,5 @@
 import csv
+import glob
 import logging
 import os
 
@@ -12,10 +13,12 @@ except ModuleNotFoundError:
     GPU_AVAILABLE = False
 
 import click
+import natsort
 import numpy  # this line is not redundant
 import pandas as pd
 import skimage.draw
 import skimage.io
+from tqdm import tqdm
 
 
 def align_images(image, shift, pad_width=None):
@@ -90,7 +93,7 @@ def register_translation(src_image, target_image,
     midpoints = np.array([float(np.fix(axis_size / 2)) for axis_size in shape])
     shifts = np.array(maxima, dtype=np.float64)
     shifts[shifts > midpoints] -= np.array(shape)[shifts > midpoints]
-    shifts = np.flip(shifts, axis=0).astype(np.int)  # x, y order
+    shifts = np.flip(shifts, axis=0).astype(int)  # x, y order
     return shifts
 
 
@@ -174,7 +177,7 @@ def calculate_relative_shifts(filenames):
         Ordered list of filenames
     """
     my_generator = read_files(filenames)
-    for (img1, img2) in my_generator:
+    for (img1, img2) in tqdm(my_generator, total=len(filenames)):
         shift = register_translation(img1, img2)
         yield shift
 
@@ -236,17 +239,21 @@ def find_filenames(filename_pattern):
 
     Parameters
     ----------
-    filename_pattern : str
-        Regex pattern matching files of interest.
+-   filename_pattern : str
+-       Regex pattern matching files of interest.
 
     Returns
     -------
     filenames
         Ordered list of filenames (alphabetical ordering).
     """
-    image_collection = skimage.io.imread_collection(
-        load_pattern=filename_pattern)
-    filenames = image_collection.files
+    filenames = glob.glob(filename_pattern)
+    filenames = natsort.natsorted(filenames)
+    n_filenames = len(filenames)
+    if n_filenames == 0:
+        raise RuntimeError("No matching files found at this location.")
+    else:
+        print(n_filenames, "matching filenames found.")
     return filenames
 
 
@@ -304,7 +311,7 @@ def align_and_save_images(filenames, output_directory, cumulative_shift_df,
     -------
     output_filename, aligned_image
     """
-    for filename, (idx, row) in zip(filenames, cumulative_shift_df.iterrows()):
+    for filename, (idx, row) in tqdm(zip(filenames, cumulative_shift_df.iterrows()), total=len(filenames)):
         image = skimage.io.imread(filename)
         image = np.array(image)  # not redundant, if you import cupy as np
         shift = [int(row['x_shift']), int(row['y_shift'])]
@@ -316,8 +323,6 @@ def align_and_save_images(filenames, output_directory, cumulative_shift_df,
             skimage.io.imsave(output_filename, np.asnumpy(aligned_image))
         else:
             skimage.io.imsave(output_filename, aligned_image)
-        print('Saved: {}'.format(output_filename))
-        yield output_filename, aligned_image
 
 
 def check_directory(directory_path):
@@ -356,14 +361,14 @@ def run_full_pipeline(input_directory, regex_pattern, output_directory):
 def pipeline(input_directory, regex_pattern, output_directory):
     # Set up output file location
     check_directory(output_directory)
+    filename_pattern = os.path.join(input_directory, regex_pattern)
+    filenames = find_filenames(filename_pattern)
     output_relative_shifts = os.path.join(
         output_directory, 'relative_shifts.csv')
     output_cumulative_shifts = os.path.join(
         output_directory, 'cumulative_shifts.csv')
-    # Set up inputs
-    full_regex_pattern = os.path.join(input_directory, regex_pattern)
-    filenames = find_filenames(full_regex_pattern)
     # Pipeline stage 1
+    print('Running pipeline stage 1')
     # Calculate relative shifts
     with open(output_relative_shifts, "w") as f:
         writes = csv.writer(f, delimiter=',', quoting=csv.QUOTE_ALL)
@@ -371,18 +376,20 @@ def pipeline(input_directory, regex_pattern, output_directory):
         writes.writerows([[0, 0]])   # the first frame is the anchor, no shift
         writes.writerows(calculate_relative_shifts(filenames))
     # Pipeline stage 2
+    print('Running pipeline stage 2')
     # Calculate the cumulative shifts
     relative_shift_df = pd.read_csv(output_relative_shifts)
     cumulative_shift_df = calculate_cumulative_shifts(relative_shift_df)
     cumulative_shift_df.to_csv(output_cumulative_shifts)
+    print('Pipeline stage 2 complete')
     # Pipeline stage 3
+    print('Running pipeline stage 3')
     # Aligning and saving the images
     # Must have relative_shift_df and cumulative_shift_df both in memory
     pad_width = calculate_padding(cumulative_shift_df)
-    mygenerator = align_and_save_images(
+    align_and_save_images(
         filenames, output_directory, cumulative_shift_df, pad_width=pad_width)
-    for filename_out, _ in mygenerator:
-        print(filename_out)
+    print("Finished.")
 
 
 if __name__ == '__main__':
